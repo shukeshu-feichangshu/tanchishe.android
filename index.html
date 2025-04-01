@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#4CAF50">
-    <title>二项式贪吃蛇</title>
+    <title>二项式贪吃蛇-第八关</title>
     <style>
         body { margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 100vh; background: #f0f0f0; touch-action: none; align-items: center; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
         .info { width: 95vw; max-width: 375px; padding: 12px; margin: 8px 0; background: white; text-align: center; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -26,65 +26,13 @@
         #message { color: #666; font-size: 13px; margin-top: 6px; line-height: 1.4; }
         .time-info { display: flex; justify-content: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
         .time-info span { white-space: nowrap; }
-
-        /* 新增开始页面样式 */
-        .start-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.95);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 20px;
-        }
-        .level-select {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            max-width: 375px;
-            width: 100%;
-            padding: 20px;
-        }
-        .level-btn {
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            background: #4CAF50;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            transition: transform 0.1s;
-            min-height: 60px;
-        }
-        .close-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            padding: 10px 20px;
-        }
-        @media (max-width: 375px) {
-            .level-btn { font-size: 14px; padding: 12px; }
-        }
+        @media (max-width: 375px) { button { padding: 12px; font-size: 15px; min-height: 48px; } .info { font-size: 14px; } #message { font-size: 12px; } .time-info { gap: 8px; } }
     </style>
 </head>
 <body>
-    <!-- 开始页面 -->
-    <div class="start-screen" id="startScreen">
-        <h2>选择关卡</h2>
-        <div class="level-select"></div>
-        <button class="level-btn close-btn" onclick="closeStartScreen()">关闭</button>
-    </div>
-
-    <!-- 游戏主界面 -->
     <div class="info">
         <div class="time-info">
             <span>时间: <span id="timer">00:00</span></span>
-            <span>关卡: <span id="level">1</span></span>
             <span>得分: <span id="score">0</span></span>
             <span>错误: <span id="errors">0</span></span>
         </div>
@@ -102,7 +50,7 @@
         </div>
         <div class="action-buttons">
             <button id="startPauseBtn">开始</button>
-            <button id="restartBtn" onclick="showStartScreen()">选关</button>
+            <button id="restartBtn">重玩</button>
         </div>
     </div>
 
@@ -112,11 +60,21 @@ let GRID_SIZE;
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// 游戏状态相关
-let currentLevel = 0;
+// 游戏配置
+const CURRENT_LEVEL = 7; // 固定第八关
+const BASE_SPEED = 180;  // 第八关速度
+
+// 游戏状态
 let isPaused = true;
 let food = [];
-const BASE_SPEED = 260;
+let gameStats = {
+    score: 0,
+    errors: 0,
+    snake: [{ x: Math.floor(GRID_COUNT/2), y: Math.floor(GRID_COUNT/2) }],
+    direction: 'right',
+    nextDirection: 'right',
+    currentFoodIndex: 0
+};
 
 // 计时器相关
 let startTime = 0;
@@ -130,59 +88,9 @@ const superscriptMap = {
     '+': '⁺', '-': '⁻', '(': '⁽', ')': '⁾'
 };
 
-class GameState {
-    constructor() {
-        this.fullReset();
-    }
-    
-    fullReset() {
-        this.totalScore = 0;
-        this.totalErrors = 0;
-        this.resetLevel();
-    }
-    
-    resetLevel() {
-        this.snake = [{ x: Math.floor(GRID_COUNT/2), y: Math.floor(GRID_COUNT/2) }];
-        this.direction = 'right';
-        this.nextDirection = 'right';
-        this.currentFoodIndex = 0;
-        this.levelScore = 0;
-        this.levelErrors = 0;
-    }
-}
-
-const gameState = new GameState();
-
-// 初始化关卡选择
-function initLevelSelect() {
-    const container = document.querySelector('.level-select');
-    levels.forEach((_, index) => {
-        const btn = document.createElement('button');
-        btn.className = 'level-btn';
-        btn.textContent = `第 ${index + 1} 关`;
-        btn.onclick = () => startGame(index);
-        container.appendChild(btn);
-    });
-}
-
-function startGame(selectedLevel) {
-    currentLevel = selectedLevel;
-    closeStartScreen();
-    initGame();
-}
-
-function showStartScreen() {
-    gameState.fullReset();
-    document.getElementById('startScreen').style.display = 'flex';
-    isPaused = true;
-    stopTimer();
-}
-
-function closeStartScreen() {
-    document.getElementById('startScreen').style.display = 'none';
-}
-
-function generateBinomialTerms(n) {
+// 生成第八关食物项
+const levelFoods = (() => {
+    const n = 8;
     const terms = [];
     const formatExponent = (num) => {
         return num > 1 ? num.toString().split('').map(c => superscriptMap[c] || c).join('') : '';
@@ -200,11 +108,10 @@ function generateBinomialTerms(n) {
         terms.push(term);
     }
     return terms;
-}
+})();
 
 function combination(n, k) {
     if (k < 0 || k > n) return 0;
-    if (k === 0 || k === n) return 1;
     k = Math.min(k, n - k);
     let result = 1;
     for (let i = 1; i <= k; i++) {
@@ -212,10 +119,6 @@ function combination(n, k) {
     }
     return Math.round(result);
 }
-
-const levels = Array.from({length: 8}, (_, i) => ({
-    foods: generateBinomialTerms(i + 1)
-}));
 
 function resizeCanvas() {
     const container = document.querySelector('.game-area');
@@ -239,8 +142,8 @@ window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100)
 resizeCanvas();
 
 function generateFood() {
-    const occupied = new Set(gameState.snake.map(p => `${p.x},${p.y}`));
-    const padding = Math.min(1, Math.floor(currentLevel/3));
+    const occupied = new Set(gameStats.snake.map(p => `${p.x},${p.y}`));
+    const padding = 2; // 第八关生成区域更靠近中心
     
     const available = [];
     for(let x = padding; x < GRID_COUNT - padding; x++) {
@@ -251,7 +154,7 @@ function generateFood() {
     }
     
     available.sort(() => Math.random() - 0.5);
-    food = levels[currentLevel].foods.map((label, i) => {
+    food = levelFoods.map((label, i) => {
         const pos = available[i % available.length];
         occupied.add(`${pos.x},${pos.y}`);
         return { ...pos, label, eaten: false };
@@ -284,20 +187,26 @@ function updateTimerDisplay() {
 }
 
 function initGame() {
-    gameState.resetLevel();
+    gameStats = {
+        score: 0,
+        errors: 0,
+        snake: [{ x: Math.floor(GRID_COUNT/2), y: Math.floor(GRID_COUNT/2) }],
+        direction: 'right',
+        nextDirection: 'right',
+        currentFoodIndex: 0
+    };
     isPaused = true;
     resetTimer();
     generateFood();
     updateDisplay();
-    showMessage(`当前公式: (a+b)${superscriptMap[currentLevel+1]}  需要顺序: ${levels[currentLevel].foods.join(' → ')}`);
+    showMessage(`当前公式: (a+b)⁸  需要顺序: ${levelFoods.join(' → ')}`);
     document.getElementById('startPauseBtn').textContent = '开始';
     draw();
 }
 
 function updateDisplay() {
-    document.getElementById('level').textContent = currentLevel + 1;
-    document.getElementById('score').textContent = gameState.totalScore + gameState.levelScore;
-    document.getElementById('errors').textContent = gameState.totalErrors + gameState.levelErrors;
+    document.getElementById('score').textContent = gameStats.score;
+    document.getElementById('errors').textContent = gameStats.errors;
 }
 
 function showMessage(msg, isError = false) {
@@ -314,7 +223,7 @@ function draw() {
     ctx.lineWidth = 2;
     ctx.strokeRect(4, 4, canvas.width-8, canvas.height-8);
 
-    gameState.snake.forEach((seg, i) => {
+    gameStats.snake.forEach((seg, i) => {
         const size = GRID_SIZE - 4 + (i === 0 ? 8 : 0);
         ctx.fillStyle = `hsl(${120 + i * 5}, 70%, 50%)`;
         ctx.beginPath();
@@ -354,21 +263,23 @@ function draw() {
 }
 
 function update() {
-    const head = {...gameState.snake[0]};
-    switch(gameState.direction) {
+    const head = {...gameStats.snake[0]};
+    switch(gameStats.direction) {
         case 'up': head.y--; break;
         case 'down': head.y++; break;
         case 'left': head.x--; break;
         case 'right': head.x++; break;
     }
 
+    // 边界穿越处理
     if (head.x < 0) head.x = GRID_COUNT - 1;
     if (head.x >= GRID_COUNT) head.x = 0;
     if (head.y < 0) head.y = GRID_COUNT - 1;
     if (head.y >= GRID_COUNT) head.y = 0;
 
-    if (gameState.snake.slice(1).some(s => s.x === head.x && s.y === head.y)) {
-        gameState.levelErrors++;
+    // 碰撞检测
+    if (gameStats.snake.slice(1).some(s => s.x === head.x && s.y === head.y)) {
+        gameStats.errors++;
         gameOver();
         return;
     }
@@ -376,38 +287,33 @@ function update() {
     let ateCorrect = false;
     food.forEach(f => {
         if (!f.eaten && f.x === head.x && f.y === head.y) {
-            if (f.label === levels[currentLevel].foods[gameState.currentFoodIndex]) {
+            if (f.label === levelFoods[gameStats.currentFoodIndex]) {
                 f.eaten = true;
-                gameState.currentFoodIndex++;
-                gameState.levelScore += 100;
+                gameStats.currentFoodIndex++;
+                gameStats.score += 100;
                 ateCorrect = true;
                 updateDisplay();
                 
-                if (gameState.currentFoodIndex === levels[currentLevel].foods.length) {
-                    gameState.totalScore += gameState.levelScore;
-                    gameState.totalErrors += gameState.levelErrors;
-                    showMessage(`🎉 本关完成！得分: ${gameState.levelScore}`, false);
+                if (gameStats.currentFoodIndex === levelFoods.length) {
+                    showMessage(`🎉 通关！得分: ${gameStats.score} 错误: ${gameStats.errors}`);
                     isPaused = true;
                     stopTimer();
-                    document.getElementById('startPauseBtn').textContent = '继续';
                 }
             } else {
-                gameState.levelErrors++;
+                gameStats.errors++;
                 showMessage("吃错顺序了！", true);
                 updateDisplay();
             }
         }
     });
 
-    gameState.snake.unshift(head);
-    if (!ateCorrect) gameState.snake.pop();
+    gameStats.snake.unshift(head);
+    if (!ateCorrect) gameStats.snake.pop();
     draw();
 }
 
 function gameOver() {
-    gameState.totalScore += gameState.levelScore;
-    gameState.totalErrors += gameState.levelErrors;
-    showMessage(`游戏结束！累计得分: ${gameState.totalScore} 累计错误: ${gameState.totalErrors}`);
+    showMessage(`游戏结束！得分: ${gameStats.score} 错误: ${gameStats.errors}`);
     isPaused = true;
     stopTimer();
     document.getElementById('startPauseBtn').textContent = '开始';
@@ -422,9 +328,9 @@ const validTransitions = {
 };
 
 function setDirection(newDir) {
-    if (validTransitions[gameState.direction].includes(newDir)) {
-        gameState.nextDirection = newDir;
-        gameState.direction = newDir;
+    if (validTransitions[gameStats.direction].includes(newDir)) {
+        gameStats.nextDirection = newDir;
+        gameStats.direction = newDir;
     }
 }
 
@@ -437,7 +343,7 @@ canvas.addEventListener('touchend', e => {
     const x = (touch.clientX - rect.left) * scaleX;
     const y = (touch.clientY - rect.top) * scaleY;
     
-    const head = gameState.snake[0];
+    const head = gameStats.snake[0];
     const dx = (x / canvas.width) - (head.x + 0.5)/GRID_COUNT;
     const dy = (y / canvas.height) - (head.y + 0.5)/GRID_COUNT;
     
@@ -464,32 +370,24 @@ Object.entries(controls).forEach(([id, dir]) => {
 document.getElementById('startPauseBtn').addEventListener('click', () => {
     if (isPaused) {
         isPaused = false;
-        startPauseBtn.textContent = '暂停';
+        document.getElementById('startPauseBtn').textContent = '暂停';
         startTimer();
         lastUpdate = performance.now();
         requestAnimationFrame(gameLoop);
     } else {
         isPaused = true;
-        startPauseBtn.textContent = '继续';
+        document.getElementById('startPauseBtn').textContent = '继续';
         stopTimer();
     }
 });
 
-let lastUpdate = 0;
-function getLevelSpeed() {
-    let speed = BASE_SPEED;
-    if(currentLevel < 4) {
-        speed -= currentLevel * 18;
-    } else {
-        speed = 188;
-    }
-    return Math.max(100, speed);
-}
+document.getElementById('restartBtn').addEventListener('click', initGame);
 
+let lastUpdate = 0;
 function gameLoop(timestamp) {
     if (!isPaused) {
         const delta = timestamp - lastUpdate;
-        if (delta > getLevelSpeed()) {
+        if (delta > BASE_SPEED) {
             update();
             lastUpdate = timestamp;
         }
@@ -498,8 +396,7 @@ function gameLoop(timestamp) {
 }
 
 // 初始化游戏
-initLevelSelect();
-showStartScreen();
+initGame();
 </script>
 </body>
 </html>
