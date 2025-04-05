@@ -295,7 +295,7 @@ function update() {
                 updateDisplay();
                 
                 if (gameStats.currentFoodIndex === levelFoods.length) {
-                    showMessage(`🎉 通关！得分: ${gameStats.score} 错误: ${gameStats.errors}`);
+                    showMessage(`🎉 通关！得分: ${gameStats.score} 错误: ${gameStats.errors}人生没有白走的路，只有不忘初心才能行稳致远！`);
                     isPaused = true;
                     stopTimer();
                 }
@@ -313,7 +313,7 @@ function update() {
 }
 
 function gameOver() {
-    showMessage(`游戏结束！得分: ${gameStats.score} 错误: ${gameStats.errors}`);
+    showMessage(`游戏结束！得分: ${gameStats.score} 错误: ${gameStats.errors}人生没有白走的路，只有不忘初心才能行稳致远！`);
     isPaused = true;
     stopTimer();
     document.getElementById('startPauseBtn').textContent = '开始';
